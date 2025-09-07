@@ -1,0 +1,150 @@
+module count(
+	 input  clk,
+    input reset,  
+    input btn1, btn2,
+    output reg [6:0] value_reg
+);
+
+reg btn1_old, btn2_old;
+
+ initial begin
+	  value_reg = 0;
+	  btn1_old = 0;
+	  btn2_old = 0;
+ end
+
+// Chia t?n s? d? làm m?i LED (kho?ng 100Hz)
+
+    always @(posedge clk) begin
+    if(reset) value_reg <= 0;
+    else begin
+        // Detect rising edge of btn1
+        if (btn1 && !btn1_old && value_reg < 99) begin
+            value_reg <= value_reg + 1'b1;
+        end
+        
+        // Detect rising edge of btn2
+        else if (btn2 && !btn2_old && value_reg > 0) begin
+            value_reg <= value_reg - 1'b1;
+        end
+        
+        // Update previous button states
+        btn1_old <= btn1;
+        btn2_old <= btn2;
+    end
+    end
+endmodule
+
+
+
+
+module led_seg(
+    input clk,
+	 input wire [6:0] bin_value,
+    output reg [6:0] seg,   // 7 do?n (a, b, c, d, e, f, g)
+    output reg an     // Ch?n LED (anode)
+);
+
+// Khai báo các bi?n
+reg [3:0] tens;         // Ch? s? hàng ch?c
+reg [3:0] units;        // Ch? s? hàng don v?
+reg [31:0] counter;     // B? d?m d? chia t?n s?
+reg toggle;             // Tín hi?u chuy?n d?i LED
+
+
+
+// Chuy?n giá tr? nh? phân (0-99) sang BCD (Binary-Coded Decimal)
+always @(*) begin
+    if (bin_value < 10) begin
+        tens = 4'd0;
+        units = bin_value;
+    end else if (bin_value < 20) begin
+        tens = 4'd1;
+        units = bin_value - 10;
+    end else if (bin_value < 30) begin
+        tens = 4'd2;
+        units = bin_value - 20;
+    end else if (bin_value < 40) begin
+        tens = 4'd3;
+        units = bin_value - 30;
+    end else if (bin_value < 50) begin
+        tens = 4'd4;
+        units = bin_value - 40;
+    end else if (bin_value < 60) begin
+        tens = 4'd5;
+        units = bin_value - 50;
+    end else if (bin_value < 70) begin
+        tens = 4'd6;
+        units = bin_value - 60;
+    end else if (bin_value < 80) begin
+        tens = 4'd7;
+        units = bin_value - 70;
+    end else if (bin_value < 90) begin
+        tens = 4'd8;
+        units = bin_value - 80;
+    end else begin
+        tens = 4'd9;
+        units = bin_value - 90;
+    end
+end
+
+
+always @(posedge clk ) begin
+        counter <= counter + 1;
+        if (counter >=  27000) begin  // Ði?u ch?nh giá tr? d? thay d?i t?c d?
+            toggle <= ~toggle;
+            counter <= 0;
+        end
+
+        if (toggle) begin
+            seg <= ~seg7_decoder(tens);  // Hi?n th? hàng ch?c
+            an <= 1;               // B?t LED hàng ch?c
+        end else begin
+            seg <= ~seg7_decoder(units); // Hi?n th? hàng don v?
+            an <= 0;               // B?t LED hàng don v?
+        end
+end
+
+// Gi?i mã 7 do?n cho 1 ch? s?
+function [6:0] seg7_decoder;
+    input [3:0] num;
+    case (num)
+        4'd0: seg7_decoder = 7'b1000000;  // 0 (a, b, c, d, e, f on)
+        4'd1: seg7_decoder = 7'b1111001;  // 1 (b, c on)
+        4'd2: seg7_decoder = 7'b0100100;  // 2
+        4'd3: seg7_decoder = 7'b0110000;  // 3
+        4'd4: seg7_decoder = 7'b0011001;  // 4
+        4'd5: seg7_decoder = 7'b0010010;  // 5
+        4'd6: seg7_decoder = 7'b0000010;  // 6
+        4'd7: seg7_decoder = 7'b1111000;  // 7
+        4'd8: seg7_decoder = 7'b0000000;  // 8
+        4'd9: seg7_decoder = 7'b0010000;  // 9
+        default: seg7_decoder = 7'b1111111; // T?t t?t c?
+    endcase
+endfunction
+
+
+endmodule
+
+
+module thu(
+    input clk_in,reset,
+	input btn_u, btn_d,
+    output [5:0] bin_value,
+    output [6:0] seg,   // 7 do?n (a, b, c, d, e, f, g)
+    output dp,
+    output an     // Ch?n LED (anode)
+);
+assign dp = 0;
+// Khai báo các bi?n
+reg clk;
+wire [6:0] bin_value;  // Giá tr? t? module counter (0-99)
+
+count u0 (clk,reset, btn_u, btn_d, bin_value);
+led_seg u1 (clk, {0,bin_value}, seg, an);
+
+
+reg [23:0] count; 
+always @(posedge clk_in) clk = ~clk;
+
+endmodule
